@@ -1,0 +1,39 @@
+<!doctype>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width; initial-scale=1">
+    <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+    <link href="index.css" rel="stylesheet" type="text/css"></link>
+  </head>
+  <body>
+    <header/>
+    <main>
+      <section class="section section--about">
+        <h1>Hannover Elm Language Meetup</h1>
+        <p>$description$</p>
+      </section>
+      <section class="section section--events">
+        $for(events)$
+          <h2>Next Meetup: <small>$local_date$ $local_time$</small></h2>
+          <a href="$link$" target="_blank">RSVP on Meetup</a>
+          <article class="event">
+            <h3>
+              $name$
+              <small>
+                <span>$local_date$</span>&nbsp;<span>$local_time$</span>
+              </small>
+            </h3>
+            <p>$description$</p>
+        </article>
+        $endfor$
+      </section>
+    </main>
+    <footer>
+      last updated $currentDate$,
+      <a href="https://github.com/hannover-elm/website" target="_blank">source code</a>
+      <a href="imprint.txt" target="_blank" rel="nofollow">imprint</a>,
+      <a href="datenschutz.txt" target="_blank" rel="nofollow">datenschutz</a>
+    </footer>
+  </body>
+</html>
