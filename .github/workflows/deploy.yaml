@@ -1,0 +1,21 @@
+name: deploy
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: "0 * * * *"
+env:
+  NIX_PATH: nixpkgs=https://github.com/NixOS/nixpkgs/archive/19.09.tar.gz
+jobs:
+  build:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v6
+      - run: nix-shell --run "make build"
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          publish_dir: ./_site
