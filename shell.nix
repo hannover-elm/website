@@ -6,6 +6,7 @@ in
 mkShell {
   buildInputs = [
     curl
+    elmPackages.elm
     ghc
     jq
     python3

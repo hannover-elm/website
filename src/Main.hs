@@ -52,6 +52,10 @@ main = do
       route idRoute
       compile copyFileCompiler
 
+    match "logo.js" $ do
+      route idRoute
+      compile copyFileCompiler
+
     match "src/imprint.txt" $ do
       route (constRoute "imprint.txt")
       compile copyFileCompiler

@@ -1,13 +1,22 @@
-<!doctype>
-<html>
+<!doctype html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width; initial-scale=1">
     <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
     <link href="index.css" rel="stylesheet" type="text/css"></link>
+    <!--
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500|Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web-elm@3.0.0/dist/material-components-web-elm.min.css">
+    <script src="https://unpkg.com/material-components-web-elm@3.0.0/dist/material-components-web-elm.min.js"></script>
+    -->
   </head>
   <body>
-    <header/>
+    <header>
+      <div id="logo"></div>
+      <script src="logo.js"></script>
+      <script> Elm.Logo.init({ node: document.querySelector("#logo") }); </script>
+    </header>
     <main>
       <section class="section section--about">
         <h1>Hannover Elm Language Meetup</h1>

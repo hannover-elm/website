@@ -1,5 +1,8 @@
-build: src/Main.hs index.css meetup.json events.json
+build: src/Main.hs index.css meetup.json events.json logo.js
 	runghc src/Main.hs rebuild
+
+logo.js: src/Logo.elm
+	elm make --optimize src/Logo.elm --output logo.js
 
 
 index.css: src/index.sass
@@ -16,9 +19,11 @@ events.json:
 
 clean:
 	rm -f index.css
-	rm -f events.json
-	rm -f meetup.json
+	rm -f logo.js
+	rm -rf _site
 
 
 distclean: clean
-	rm -rf _site _cache
+	rm -f events.json
+	rm -f meetup.json
+	rm -rf _cache
