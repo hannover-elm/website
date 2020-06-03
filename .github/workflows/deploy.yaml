@@ -6,7 +6,7 @@ on:
   schedule:
     - cron: "0 0 * * *"
 env:
-  NIX_PATH: nixpkgs=https://github.com/NixOS/nixpkgs/archive/19.09.tar.gz
+  NIX_PATH: nixpkgs=https://github.com/NixOS/nixpkgs/archive/20.03.tar.gz
 jobs:
   build:
     name: Deploy to GitHub Pages
