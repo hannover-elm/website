@@ -10,28 +10,22 @@ import Camera3d exposing (Camera3d)
 import Color exposing (Color)
 import Direction3d exposing (Direction3d)
 import Duration exposing (Duration)
-import Ease
 import Frame3d
 import Html exposing (Html, text)
 import Html.Attributes exposing (style)
+import Html.Events
 import Illuminance exposing (Illuminance)
+import Json.Decode as Decode
 import Length exposing (Length, Meters)
-import Luminance
-import Material.Slider as Slider
-import Material.Typography as Typography
-import Palette.Tango as Tango
 import Pixels
 import Plane3d
 import Point2d
 import Point3d
 import Quantity
-import Scene3d
-import Scene3d.Chromaticity as Chromaticity exposing (Chromaticity)
-import Scene3d.Entity as Entity
-import Scene3d.Exposure as Exposure
+import Scene3d exposing (Entity)
+import Scene3d.Light as Light exposing (Chromaticity)
 import Scene3d.Material as Material exposing (Material)
 import Scene3d.Mesh as Mesh
-import Scene3d.Transformation as Transformation
 import SketchPlane3d
 import Sphere3d
 import Task exposing (Task)
@@ -39,6 +33,11 @@ import Triangle2d
 import Triangle3d
 import Vector3d
 import Viewpoint3d exposing (Viewpoint3d)
+
+
+displayControls : Bool
+displayControls =
+    False
 
 
 margin : Float
@@ -49,11 +48,6 @@ margin =
 aspectRatio : Float
 aspectRatio =
     385 / 600
-
-
-animationLength : Duration
-animationLength =
-    Duration.seconds 5
 
 
 type Model
@@ -68,8 +62,8 @@ type alias LoadedData =
     , verticalFieldOfView : Float
     , timeElapsed : Duration
     , materials : MaterialInputs
-    , lights : LightInputs
-    , cachedBuilding : Entity.Entity Xyz
+    , light : LightInput
+    , cachedBuilding : Entity Xyz
     }
 
 
@@ -85,70 +79,36 @@ type alias MaterialInputs =
     }
 
 
-type alias LightInputs =
-    { key : LightInput
-    , fill : LightInput
-    , back : LightInput
-    }
-
-
 initialLoadedData : LoadedData
 initialLoadedData =
     let
         materials =
             { brick =
-                { baseColor =
-                    Color.fromHSL
-                        ( 38.499064389421264, 56.97875908940121, 78.1079560233666 )
+                { baseColor = Color.hsl 0.11 0.57 0.78
                 , roughness = 1
-                , metallic = 0
                 }
             , shingles =
-                { baseColor =
-                    Color.fromHSL ( 13.483604447958669, 100, 37.60377358490566 )
-                , roughness = 0.6113207547169811
-                , metallic = 0
+                { baseColor = Color.hsl 0.04 1 0.38
+                , roughness = 0.61
                 }
             , copper =
-                { baseColor =
-                    Color.fromHSL
-                        ( 156.65660377358503, 36.2063492063492, 72.0377358490566 )
-                , roughness = 0.7622142058283398
-                , metallic = 0
+                { baseColor = Color.hsl 0.44 0.36 0.72
+                , roughness = 0.76
                 }
             , grass =
-                { baseColor =
-                    Color.fromHSL
-                        ( 98.15094339622642, 50.18867924528302, 33.9622641509434 )
-                , roughness = 0.8867924528301887
-                , metallic = 0
+                { baseColor = Color.hsl 0.27 0.5 0.34
+                , roughness = 0.89
                 }
             }
     in
-    { focalPointZ = 3.0068258407915627
-    , eyePointY = -20
-    , eyePointZ = 0.7548686466307473
-    , verticalFieldOfView = 20.00266445496179
+    { focalPointZ = 3.01
+    , eyePointY = -21.5
+    , eyePointZ = 0.75
+    , verticalFieldOfView = 20
     , timeElapsed = Duration.seconds 0
-    , lights =
-        { key =
-            { chromaticity = Chromaticity.d65
-            , intensity = Illuminance.lux 10000
-            , azimuth = Angle.degrees 54.351620314477074
-            , elevation = Angle.degrees -45.845370877967845
-            }
-        , fill =
-            { chromaticity = Chromaticity.d65
-            , intensity = Illuminance.lux 2500
-            , azimuth = Angle.degrees 83.2845085894129
-            , elevation = Angle.degrees -45
-            }
-        , back =
-            { chromaticity = Chromaticity.d65
-            , intensity = Illuminance.lux 5000
-            , azimuth = Angle.degrees 25.827204453623803
-            , elevation = Angle.degrees -45
-            }
+    , light =
+        { azimuth = Angle.degrees 60
+        , elevation = Angle.degrees -32.5
         }
     , materials = materials
     , cachedBuilding = building materials
@@ -156,29 +116,22 @@ initialLoadedData =
 
 
 viewpoint : LoadedData -> Viewpoint3d Meters world
-viewpoint model =
+viewpoint ({ timeElapsed } as loadedData) =
     Viewpoint3d.lookAt
-        { focalPoint = Point3d.meters 0 0 model.focalPointZ
+        { focalPoint = Point3d.meters 0 0 loadedData.focalPointZ
         , eyePoint =
             Point3d.meters 0
-                (model.eyePointY
-                    + 0.1
-                    * cos (8412.213 + Duration.inSeconds model.timeElapsed)
-                )
-                (model.eyePointZ
-                    + 0.2
-                    * cos (9157.591 + Duration.inSeconds model.timeElapsed)
-                )
+                (loadedData.eyePointY - 0.25 * cos (Duration.inSeconds timeElapsed / 3))
+                (loadedData.eyePointZ + 0.45 * cos (Duration.inSeconds timeElapsed / 5))
         , upDirection = Direction3d.positiveZ
         }
 
 
 camera : LoadedData -> Camera3d Meters world
-camera model =
+camera loadedData =
     Camera3d.perspective
-        { viewpoint = viewpoint model
-        , verticalFieldOfView = Angle.degrees model.verticalFieldOfView
-        , clipDepth = Length.meters 0.1
+        { viewpoint = viewpoint loadedData
+        , verticalFieldOfView = Angle.degrees loadedData.verticalFieldOfView
         }
 
 
@@ -202,23 +155,18 @@ type Msg
     | ShinglesChanged MaterialInput
     | CopperChanged MaterialInput
     | GrassChanged MaterialInput
-    | KeyLightChanged LightInput
-    | BackLightChanged LightInput
-    | FillLightChanged LightInput
+    | LightChanged LightInput
     | Resized Viewport
 
 
 type alias MaterialInput =
     { baseColor : Color
     , roughness : Float
-    , metallic : Float
     }
 
 
 type alias LightInput =
-    { chromaticity : Chromaticity
-    , intensity : Illuminance
-    , azimuth : Angle
+    { azimuth : Angle
     , elevation : Angle
     }
 
@@ -237,80 +185,78 @@ init () =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg state =
-    case ( msg, state ) of
+update msg model =
+    case ( msg, model ) of
         ( Resized viewport, Loading ) ->
             ( Loaded viewport initialLoadedData, Cmd.none )
 
         ( _, Loading ) ->
             ( Loading, Cmd.none )
 
-        ( Resized viewport, Loaded _ model ) ->
-            ( Loaded viewport (updateLoaded msg model), Cmd.none )
+        ( Resized viewport, Loaded _ loadedData ) ->
+            ( Loaded viewport (updateLoaded msg loadedData), Cmd.none )
 
-        ( _, Loaded viewport model ) ->
-            ( Loaded viewport (updateLoaded msg model), Cmd.none )
+        ( _, Loaded viewport loadedData ) ->
+            ( Loaded viewport (updateLoaded msg loadedData), Cmd.none )
 
 
 updateLoaded : Msg -> LoadedData -> LoadedData
-updateLoaded msg model =
+updateLoaded msg loadedData =
     case msg of
         FocalPointZChanged focalPointZ ->
-            { model | focalPointZ = focalPointZ }
+            { loadedData | focalPointZ = focalPointZ }
 
         EyePointYChanged eyePointY ->
-            { model | eyePointY = eyePointY }
+            { loadedData | eyePointY = eyePointY }
 
         EyePointZChanged eyePointZ ->
-            { model | eyePointZ = eyePointZ }
+            { loadedData | eyePointZ = eyePointZ }
 
         VerticalFieldOfViewChanged verticalFieldOfView ->
-            { model | verticalFieldOfView = verticalFieldOfView }
+            { loadedData | verticalFieldOfView = verticalFieldOfView }
 
         BrickChanged brick ->
-            mapMaterials (\materials -> { materials | brick = brick }) model
+            mapMaterials (\materials -> { materials | brick = brick }) loadedData
+                |> recomputeCachedBuilding
 
         ShinglesChanged shingles ->
-            mapMaterials (\materials -> { materials | shingles = shingles }) model
+            mapMaterials (\materials -> { materials | shingles = shingles }) loadedData
+                |> recomputeCachedBuilding
 
         CopperChanged copper ->
-            mapMaterials (\materials -> { materials | copper = copper }) model
+            mapMaterials (\materials -> { materials | copper = copper }) loadedData
+                |> recomputeCachedBuilding
 
         GrassChanged grass ->
-            mapMaterials (\materials -> { materials | grass = grass }) model
+            mapMaterials (\materials -> { materials | grass = grass }) loadedData
+                |> recomputeCachedBuilding
 
-        KeyLightChanged key ->
-            mapLights (\lights -> { lights | key = key }) model
-
-        FillLightChanged fill ->
-            mapLights (\lights -> { lights | fill = fill }) model
-
-        BackLightChanged back ->
-            mapLights (\lights -> { lights | back = back }) model
+        LightChanged light ->
+            { loadedData | light = light }
 
         Simulated timeSinceLastFrame ->
-            { model
+            { loadedData
                 | timeElapsed =
                     Quantity.plus (Duration.milliseconds timeSinceLastFrame)
-                        model.timeElapsed
+                        loadedData.timeElapsed
             }
 
         Resized _ ->
-            model
+            loadedData
 
 
 mapMaterials : (MaterialInputs -> MaterialInputs) -> LoadedData -> LoadedData
-mapMaterials f model =
-    { model | materials = f model.materials }
+mapMaterials f loadedData =
+    { loadedData | materials = f loadedData.materials }
 
 
-mapLights : (LightInputs -> LightInputs) -> LoadedData -> LoadedData
-mapLights f model =
-    { model | lights = f model.lights }
+recomputeCachedBuilding : LoadedData -> LoadedData
+recomputeCachedBuilding ({ materials } as loadedData) =
+    { loadedData | cachedBuilding = building materials }
 
 
 subscriptions : Model -> Sub Msg
-subscriptions state =
+subscriptions model =
     let
         onResized =
             Browser.Events.onResize
@@ -321,7 +267,7 @@ subscriptions state =
         onSimulated =
             Browser.Events.onAnimationFrameDelta Simulated
     in
-    case state of
+    case model of
         Loading ->
             onResized
 
@@ -330,20 +276,20 @@ subscriptions state =
 
 
 view : Model -> Html Msg
-view state =
-    case state of
+view model =
+    case model of
         Loading ->
             text ""
 
-        Loaded viewport model ->
+        Loaded viewport loadedData ->
             Html.div []
-                [ scene viewport model
-                , controls viewport model
+                [ scene viewport loadedData
+                , controls viewport loadedData
                 ]
 
 
 controls : Viewport -> LoadedData -> Html Msg
-controls viewport model =
+controls viewport loadedData =
     Html.div
         [ style "position" "fixed"
         , style "top" "0"
@@ -352,77 +298,73 @@ controls viewport model =
         , style "max-height" "100vh"
         , style "overflow-y" "auto"
         , style "padding-right" "20px"
-        , style "display" "none"
+        , style "display"
+            (if displayControls then
+                "block"
+
+             else
+                "none"
+            )
         ]
         [ slider
             { label = "focalPointZ"
             , onChange = FocalPointZChanged
             , min = -10
             , max = 10
-            , value = model.focalPointZ
+            , value = loadedData.focalPointZ
             }
         , slider
             { label = "eyePointY"
             , onChange = EyePointYChanged
             , min = -20
             , max = 5
-            , value = model.eyePointY
+            , value = loadedData.eyePointY
             }
         , slider
             { label = "eyePointZ"
             , onChange = EyePointZChanged
             , min = -10
-            , max = 20
-            , value = model.eyePointZ
+            , max = 30
+            , value = loadedData.eyePointZ
             }
         , slider
             { label = "verticalFieldOfView"
             , onChange = VerticalFieldOfViewChanged
             , min = 0
             , max = 100
-            , value = model.verticalFieldOfView
+            , value = loadedData.verticalFieldOfView
             }
         , slider
             { label = "timeElapsed"
             , onChange = Simulated
             , min = 0
             , max = 9999
-            , value = Duration.inSeconds model.timeElapsed
+            , value = Duration.inSeconds loadedData.timeElapsed
             }
         , lightControl
             { label = "key"
-            , onChange = KeyLightChanged
-            , value = model.lights.key
-            }
-        , lightControl
-            { label = "fill"
-            , onChange = FillLightChanged
-            , value = model.lights.fill
-            }
-        , lightControl
-            { label = "back"
-            , onChange = BackLightChanged
-            , value = model.lights.back
+            , onChange = LightChanged
+            , value = loadedData.light
             }
         , materialControl
             { label = "brick"
             , onChange = BrickChanged
-            , value = model.materials.brick
+            , value = loadedData.materials.brick
             }
         , materialControl
             { label = "shingles"
             , onChange = ShinglesChanged
-            , value = model.materials.shingles
+            , value = loadedData.materials.shingles
             }
         , materialControl
             { label = "copper"
             , onChange = CopperChanged
-            , value = model.materials.copper
+            , value = loadedData.materials.copper
             }
         , materialControl
             { label = "grass"
             , onChange = GrassChanged
-            , value = model.materials.grass
+            , value = loadedData.materials.grass
             }
         ]
 
@@ -436,16 +378,31 @@ slider :
     }
     -> Html msg
 slider { label, onChange, min, max, value } =
-    Html.div []
-        [ Html.label [ Typography.caption ]
-            [ text (label ++ ": " ++ String.fromFloat value) ]
-        , Slider.slider
-            (Slider.config
-                |> Slider.setOnChange onChange
-                |> Slider.setMin (Just min)
-                |> Slider.setMax (Just max)
-                |> Slider.setValue (Just value)
-            )
+    let
+        resolution =
+            100
+    in
+    Html.label []
+        [ Html.span [ style "display" "block" ]
+            [ text (label ++ ": " ++ String.fromFloat value)
+            ]
+        , Html.input
+            [ Html.Attributes.type_ "range"
+            , Html.Attributes.min "0"
+            , Html.Attributes.max (String.fromFloat (resolution * (max - min)))
+            , Html.Attributes.value (String.fromFloat (resolution * (value - min)))
+            , Html.Events.on "input"
+                (Decode.map
+                    (onChange
+                        << Maybe.withDefault value
+                        << Maybe.map (\value_ -> min + value_ / resolution)
+                        << String.toFloat
+                    )
+                    Html.Events.targetValue
+                )
+            , style "display" "block"
+            ]
+            []
         ]
 
 
@@ -457,49 +414,46 @@ materialControl :
     -> Html msg
 materialControl { label, onChange, value } =
     let
-        ( hue, saturation, luminance ) =
-            Color.toHSL value.baseColor
+        { hue, saturation, lightness } =
+            Color.toHsla value.baseColor
 
-        { roughness, metallic } =
+        { roughness } =
             value
 
         fromHue newHue =
-            { value | baseColor = Color.fromHSL ( newHue, saturation, luminance ) }
+            { value | baseColor = Color.hsl newHue saturation lightness }
 
         fromSaturation newSaturation =
-            { value | baseColor = Color.fromHSL ( hue, newSaturation, luminance ) }
+            { value | baseColor = Color.hsl hue newSaturation lightness }
 
-        fromLuminance newLuminance =
-            { value | baseColor = Color.fromHSL ( hue, saturation, newLuminance ) }
-
-        fromMetallic newMetallic =
-            { value | metallic = newMetallic }
+        fromLightness newLightness =
+            { value | baseColor = Color.hsl hue saturation newLightness }
 
         fromRoughness newRoughness =
             { value | roughness = newRoughness }
     in
     Html.div []
-        [ Html.label [ Typography.caption ] [ text (label ++ ":") ]
+        [ Html.label [] [ text (label ++ ":") ]
         , slider
             { label = "Hue"
             , onChange = onChange << fromHue
             , min = 0
-            , max = 255
+            , max = 1
             , value = hue
             }
         , slider
             { label = "Saturation"
             , onChange = onChange << fromSaturation
             , min = 0
-            , max = 100
+            , max = 1
             , value = saturation
             }
         , slider
             { label = "Luminance"
-            , onChange = onChange << fromLuminance
+            , onChange = onChange << fromLightness
             , min = 0
-            , max = 100
-            , value = luminance
+            , max = 1
+            , value = lightness
             }
         , slider
             { label = "Roughness"
@@ -507,13 +461,6 @@ materialControl { label, onChange, value } =
             , min = 0
             , max = 1
             , value = roughness
-            }
-        , slider
-            { label = "Metallic"
-            , onChange = onChange << fromMetallic
-            , min = 0
-            , max = 1
-            , value = metallic
             }
         ]
 
@@ -530,7 +477,7 @@ lightControl { label, onChange, value } =
             value
     in
     Html.div []
-        [ Html.label [ Typography.caption ] [ text (label ++ ":") ]
+        [ Html.label [] [ text (label ++ ":") ]
         , slider
             { label = "azimuth"
             , onChange =
@@ -542,7 +489,8 @@ lightControl { label, onChange, value } =
         , slider
             { label = "elevation"
             , onChange =
-                \newElevation -> onChange { value | elevation = Angle.degrees newElevation }
+                \newElevation ->
+                    onChange { value | elevation = Angle.degrees newElevation }
             , min = -90
             , max = 90
             , value = Angle.inDegrees elevation
@@ -551,65 +499,43 @@ lightControl { label, onChange, value } =
 
 
 scene : Viewport -> LoadedData -> Html Msg
-scene viewport model =
+scene viewport ({ light, timeElapsed } as loadedData) =
     let
         width =
-            min 600 (viewport.width - 2 * margin)
+            floor (min 600 (viewport.width - 2 * margin))
 
         height =
-            width * aspectRatio
-
-        lights =
-            let
-                f { chromaticity, intensity, azimuth, elevation } =
-                    { chromaticity = chromaticity
-                    , intensity = intensity
-                    , direction = Direction3d.xyZ azimuth elevation
-                    }
-            in
-            { key =
-                Scene3d.directionalLight Scene3d.castsShadows
-                    (f model.lights.key)
-            , fill =
-                Scene3d.directionalLight Scene3d.doesNotCastShadows
-                    (f model.lights.fill)
-            , back =
-                Scene3d.directionalLight Scene3d.doesNotCastShadows
-                    (f model.lights.back)
-            }
+            round (toFloat width * aspectRatio)
     in
-    Scene3d.toHtml []
-        { camera = camera model
+    Scene3d.sunny
+        { upDirection = Direction3d.positiveZ
+        , sunlightDirection = Direction3d.xyZ light.azimuth light.elevation
+        , shadows = True
         , dimensions = ( Pixels.pixels width, Pixels.pixels height )
-        , environmentalLighting =
-            Scene3d.softLighting
-                { upDirection = Direction3d.positiveZ
-                , above = ( Luminance.nits 5000, Chromaticity.d65 )
-                , below = ( Quantity.zero, Chromaticity.d65 )
-                }
-        , lights = Scene3d.threeLights lights.key lights.fill lights.back
-        , exposure = Exposure.fromMaxLuminance (Luminance.nits 5000)
-        , whiteBalance = Scene3d.defaultWhiteBalance
-        , background =
-            Scene3d.backgroundColor (Color.fromHSL ( 206.1, 48.1, 74.7 ))
+        , camera = camera loadedData
+        , clipDepth = Length.meters 0.1
+        , background = Scene3d.backgroundColor (Color.hsl 0.57 0.48 0.75)
+        , entities =
+            [ loadedData.cachedBuilding
+                |> Scene3d.rotateAround Axis3d.z
+                    (Angle.degrees
+                        (1.5 * cos (2 * pi * Duration.inSeconds timeElapsed / 7))
+                    )
+            ]
         }
-        [ Entity.rotateAround Axis3d.z
-            (Angle.degrees (1.5 * cos (Duration.inSeconds model.timeElapsed)))
-            model.cachedBuilding
-        ]
 
 
-building : MaterialInputs -> Entity.Entity coordinates
+building : MaterialInputs -> Entity coordinates
 building { brick, shingles, copper, grass } =
     let
         materials =
-            { brick = Material.pbr brick
-            , shingles = Material.pbr shingles
-            , copper = Material.pbr copper
-            , grass = Material.pbr grass
+            { brick = Material.nonmetal brick
+            , shingles = Material.nonmetal shingles
+            , copper = Material.nonmetal copper
+            , grass = Material.nonmetal grass
             }
     in
-    Entity.group
+    Scene3d.group
         [ frontBlock materials
         , rightBlock materials
         , leftBlock materials
@@ -630,7 +556,7 @@ type alias Materials coordinates =
     }
 
 
-frontBlock : Materials coordinates -> Entity.Entity coordinates
+frontBlock : Materials coordinates -> Entity coordinates
 frontBlock materials =
     let
         smallDormer =
@@ -701,7 +627,7 @@ frontBlock materials =
         ]
 
 
-rightBlock : Materials coordinates -> Entity.Entity coordinates
+rightBlock : Materials coordinates -> Entity coordinates
 rightBlock materials =
     Scene3d.group
         [ Scene3d.translateBy (Vector3d.meters 4.1 0.1 0) <|
@@ -723,12 +649,12 @@ rightBlock materials =
         ]
 
 
-leftBlock : Materials coordinates -> Entity.Entity coordinates
+leftBlock : Materials coordinates -> Entity coordinates
 leftBlock materials =
     Scene3d.mirrorAcross Plane3d.yz (rightBlock materials)
 
 
-backBlock : Materials coordinates -> Entity.Entity coordinates
+backBlock : Materials coordinates -> Entity coordinates
 backBlock materials =
     Scene3d.group
         [ Scene3d.translateBy (Vector3d.meters 0 1.8 0) <|
@@ -746,7 +672,7 @@ backBlock materials =
         ]
 
 
-centerBlock : Materials coordinates -> Entity.Entity coordinates
+centerBlock : Materials coordinates -> Entity coordinates
 centerBlock materials =
     Scene3d.group
         [ wall materials ( Length.meters 4.2, Length.meters 3.4, Length.meters 1.5 )
@@ -754,7 +680,7 @@ centerBlock materials =
         ]
 
 
-centerTower : Materials coordinates -> Entity.Entity coordinates
+centerTower : Materials coordinates -> Entity coordinates
 centerTower materials =
     Scene3d.group
         [ wall materials
@@ -777,7 +703,7 @@ centerTower materials =
         ]
 
 
-frontTowers : Materials coordinates -> Entity.Entity coordinates
+frontTowers : Materials coordinates -> Entity coordinates
 frontTowers materials =
     Scene3d.group
         [ leftFrontTower materials
@@ -785,7 +711,7 @@ frontTowers materials =
         ]
 
 
-leftFrontTower : Materials coordinates -> Entity.Entity coordinates
+leftFrontTower : Materials coordinates -> Entity coordinates
 leftFrontTower materials =
     Scene3d.group
         [ Scene3d.translateBy (Vector3d.meters 2.9 -2.25 0) <|
@@ -801,14 +727,14 @@ leftFrontTower materials =
         ]
 
 
-rightFrontTower : Materials coordinates -> Entity.Entity coordinates
+rightFrontTower : Materials coordinates -> Entity coordinates
 rightFrontTower materials =
     Scene3d.mirrorAcross Plane3d.yz (leftFrontTower materials)
 
 
-ground : Materials coordinates -> Entity.Entity coordinates
+ground : Materials coordinates -> Entity coordinates
 ground { grass } =
-    Scene3d.block Scene3d.doesNotCastShadows grass <|
+    Scene3d.blockWithShadow grass <|
         Block3d.centeredOn
             (Frame3d.atPoint
                 (Point3d.xyz
@@ -837,7 +763,7 @@ wallHelper :
     -> Dimensions3
     -> Scene3d.Entity coordinates
 wallHelper material ( width, depth, height ) =
-    Scene3d.block Scene3d.castsShadows material <|
+    Scene3d.blockWithShadow material <|
         Block3d.centeredOn
             (Frame3d.atPoint
                 (Point3d.xyz
@@ -895,10 +821,20 @@ slantedRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
 
         leftQuad =
             List.map (Triangle3d.mirrorAcross Plane3d.yz) rightQuad
+
+        triangleMesh =
+            Mesh.facets [ frontTriangle, backTriangle ]
+
+        quadMesh =
+            Mesh.facets (leftQuad ++ rightQuad)
     in
     Scene3d.group
-        [ Scene3d.mesh triangleMaterial (Mesh.facets [ frontTriangle, backTriangle ])
-        , Scene3d.mesh quadMaterial (Mesh.facets (leftQuad ++ rightQuad))
+        [ Scene3d.meshWithShadow triangleMaterial
+            triangleMesh
+            (Mesh.shadow triangleMesh)
+        , Scene3d.meshWithShadow quadMaterial
+            quadMesh
+            (Mesh.shadow quadMesh)
         ]
 
 
@@ -941,10 +877,22 @@ straightRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
 
         leftQuad =
             List.map (Triangle3d.mirrorAcross Plane3d.yz) rightQuad
+
+        triangleMesh =
+            Mesh.facets [ frontTriangle, backTriangle ]
+
+        quadMesh =
+            Mesh.facets (leftQuad ++ rightQuad)
     in
     Scene3d.group
-        [ Scene3d.mesh triangleMaterial (Mesh.facets [ frontTriangle, backTriangle ])
-        , Scene3d.mesh quadMaterial (Mesh.facets (leftQuad ++ rightQuad))
+        [ Scene3d.meshWithShadow
+            triangleMaterial
+            triangleMesh
+            (Mesh.shadow triangleMesh)
+        , Scene3d.meshWithShadow
+            quadMaterial
+            quadMesh
+            (Mesh.shadow quadMesh)
         ]
 
 
@@ -995,15 +943,18 @@ towerRoof { copper } ( width, height ) =
 
         rightTriangle =
             Triangle3d.mirrorAcross Plane3d.yz leftTriangle
+
+        mesh =
+            Mesh.facets
+                [ frontTriangle
+                , backTriangle
+                , leftTriangle
+                , rightTriangle
+                ]
     in
-    Scene3d.mesh copper
-        (Mesh.facets
-            [ frontTriangle
-            , backTriangle
-            , leftTriangle
-            , rightTriangle
-            ]
-        )
+    Scene3d.meshWithShadow copper
+        mesh
+        (Mesh.shadow mesh)
 
 
 
