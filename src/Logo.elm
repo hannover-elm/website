@@ -56,12 +56,12 @@ animationLength =
     Duration.seconds 5
 
 
-type State
+type Model
     = Loading
-    | Loaded Viewport Model
+    | Loaded Viewport LoadedData
 
 
-type alias Model =
+type alias LoadedData =
     { focalPointZ : Float
     , eyePointY : Float
     , eyePointZ : Float
@@ -92,8 +92,8 @@ type alias LightInputs =
     }
 
 
-initialModel : Model
-initialModel =
+initialLoadedData : LoadedData
+initialLoadedData =
     let
         materials =
             { brick =
@@ -155,7 +155,7 @@ initialModel =
     }
 
 
-viewpoint : Model -> Viewpoint3d Meters world
+viewpoint : LoadedData -> Viewpoint3d Meters world
 viewpoint model =
     Viewpoint3d.lookAt
         { focalPoint = Point3d.meters 0 0 model.focalPointZ
@@ -173,7 +173,7 @@ viewpoint model =
         }
 
 
-camera : Model -> Camera3d Meters world
+camera : LoadedData -> Camera3d Meters world
 camera model =
     Camera3d.perspective
         { viewpoint = viewpoint model
@@ -182,7 +182,7 @@ camera model =
         }
 
 
-main : Program () State Msg
+main : Program () Model Msg
 main =
     Browser.element
         { init = init
@@ -227,7 +227,7 @@ type alias Viewport =
     { width : Float, height : Float }
 
 
-init : () -> ( State, Cmd Msg )
+init : () -> ( Model, Cmd Msg )
 init () =
     ( Loading
     , Browser.Dom.getViewport
@@ -236,11 +236,11 @@ init () =
     )
 
 
-update : Msg -> State -> ( State, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg state =
     case ( msg, state ) of
         ( Resized viewport, Loading ) ->
-            ( Loaded viewport initialModel, Cmd.none )
+            ( Loaded viewport initialLoadedData, Cmd.none )
 
         ( _, Loading ) ->
             ( Loading, Cmd.none )
@@ -252,7 +252,7 @@ update msg state =
             ( Loaded viewport (updateLoaded msg model), Cmd.none )
 
 
-updateLoaded : Msg -> Model -> Model
+updateLoaded : Msg -> LoadedData -> LoadedData
 updateLoaded msg model =
     case msg of
         FocalPointZChanged focalPointZ ->
@@ -299,17 +299,17 @@ updateLoaded msg model =
             model
 
 
-mapMaterials : (MaterialInputs -> MaterialInputs) -> Model -> Model
+mapMaterials : (MaterialInputs -> MaterialInputs) -> LoadedData -> LoadedData
 mapMaterials f model =
     { model | materials = f model.materials }
 
 
-mapLights : (LightInputs -> LightInputs) -> Model -> Model
+mapLights : (LightInputs -> LightInputs) -> LoadedData -> LoadedData
 mapLights f model =
     { model | lights = f model.lights }
 
 
-subscriptions : State -> Sub Msg
+subscriptions : Model -> Sub Msg
 subscriptions state =
     let
         onResized =
@@ -329,7 +329,7 @@ subscriptions state =
             Sub.batch [ onResized, onSimulated ]
 
 
-view : State -> Html Msg
+view : Model -> Html Msg
 view state =
     case state of
         Loading ->
@@ -342,7 +342,7 @@ view state =
                 ]
 
 
-controls : Viewport -> Model -> Html Msg
+controls : Viewport -> LoadedData -> Html Msg
 controls viewport model =
     Html.div
         [ style "position" "fixed"
@@ -550,7 +550,7 @@ lightControl { label, onChange, value } =
         ]
 
 
-scene : Viewport -> Model -> Html Msg
+scene : Viewport -> LoadedData -> Html Msg
 scene viewport model =
     let
         width =
