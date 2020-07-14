@@ -41,6 +41,21 @@ import Vector3d
 import Viewpoint3d exposing (Viewpoint3d)
 
 
+margin : Float
+margin =
+    8
+
+
+aspectRatio : Float
+aspectRatio =
+    385 / 600
+
+
+animationLength : Duration
+animationLength =
+    Duration.seconds 5
+
+
 type State
     = Loading
     | Loaded { width : Float, height : Float } Model
@@ -52,35 +67,27 @@ type alias Model =
     , eyePointZ : Float
     , verticalFieldOfView : Float
     , timeElapsed : Duration
-    , materials :
-        { brick : { baseColor : Color, roughness : Float, metallic : Float }
-        , shingles : { baseColor : Color, roughness : Float, metallic : Float }
-        , copper : { baseColor : Color, roughness : Float, metallic : Float }
-        , grass : { baseColor : Color, roughness : Float, metallic : Float }
-        }
-    , lights :
-        { key :
-            { chromaticity : Chromaticity
-            , intensity : Illuminance
-            , azimuth : Angle
-            , elevation : Angle
-            }
-        , fill :
-            { chromaticity : Chromaticity
-            , intensity : Illuminance
-            , azimuth : Angle
-            , elevation : Angle
-            }
-        , back :
-            { chromaticity : Chromaticity
-            , intensity : Illuminance
-            , azimuth : Angle
-            , elevation : Angle
-            }
-        }
+    , materials : MaterialInputs
+    , lights : LightInputs
     }
 
 
+type alias MaterialInputs =
+    { brick : MaterialInput
+    , shingles : MaterialInput
+    , copper : MaterialInput
+    , grass : MaterialInput
+    }
+
+
+type alias LightInputs =
+    { key : LightInput
+    , fill : LightInput
+    , back : LightInput
+    }
+
+
+initialModel : Model
 initialModel =
     { focalPointZ = 3.0068258407915627
     , eyePointY = -20
@@ -139,11 +146,6 @@ viewpoint : Model -> Viewpoint3d Meters world
 viewpoint model =
     Viewpoint3d.lookAt
         { focalPoint = Point3d.meters 0 0 model.focalPointZ
-
-        -- , eyePoint = Point3d.meters 0 -30 20
-        -- , upDirection = Direction3d.positiveZ
-        -- , eyePoint = Point3d.meters 0 0 20
-        -- , upDirection = Direction3d.positiveY
         , eyePoint =
             Point3d.meters 0
                 (model.eyePointY
@@ -167,6 +169,7 @@ camera model =
         }
 
 
+main : Program () State Msg
 main =
     Browser.element
         { init = init
@@ -182,31 +185,36 @@ type Msg
     | EyePointZChanged Float
     | VerticalFieldOfViewChanged Float
     | Simulated Float
-    | BrickChanged { baseColor : Color, roughness : Float, metallic : Float }
-    | ShinglesChanged { baseColor : Color, roughness : Float, metallic : Float }
-    | CopperChanged { baseColor : Color, roughness : Float, metallic : Float }
-    | GrassChanged { baseColor : Color, roughness : Float, metallic : Float }
-    | KeyLightChanged
-        { chromaticity : Chromaticity
-        , intensity : Illuminance
-        , azimuth : Angle
-        , elevation : Angle
-        }
-    | BackLightChanged
-        { chromaticity : Chromaticity
-        , intensity : Illuminance
-        , azimuth : Angle
-        , elevation : Angle
-        }
-    | FillLightChanged
-        { chromaticity : Chromaticity
-        , intensity : Illuminance
-        , azimuth : Angle
-        , elevation : Angle
-        }
-    | Resized { width : Float, height : Float }
+    | BrickChanged MaterialInput
+    | ShinglesChanged MaterialInput
+    | CopperChanged MaterialInput
+    | GrassChanged MaterialInput
+    | KeyLightChanged LightInput
+    | BackLightChanged LightInput
+    | FillLightChanged LightInput
+    | Resized Viewport
 
 
+type alias MaterialInput =
+    { baseColor : Color
+    , roughness : Float
+    , metallic : Float
+    }
+
+
+type alias LightInput =
+    { chromaticity : Chromaticity
+    , intensity : Illuminance
+    , azimuth : Angle
+    , elevation : Angle
+    }
+
+
+type alias Viewport =
+    { width : Float, height : Float }
+
+
+init : () -> ( State, Cmd Msg )
 init () =
     ( Loading
     , Browser.Dom.getViewport
@@ -276,10 +284,12 @@ updateLoaded msg model =
             model
 
 
+mapMaterials : (MaterialInputs -> MaterialInputs) -> Model -> Model
 mapMaterials f model =
     { model | materials = f model.materials }
 
 
+mapLights : (LightInputs -> LightInputs) -> Model -> Model
 mapLights f model =
     { model | lights = f model.lights }
 
@@ -304,17 +314,22 @@ subscriptions state =
             Sub.batch [ onResized, onSimulated ]
 
 
+view : State -> Html Msg
 view state =
     case state of
         Loading ->
             text ""
 
         Loaded viewport model ->
-            Html.div [] (scene viewport model :: controls viewport model)
+            Html.div []
+                [ scene viewport model
+                , controls viewport model
+                ]
 
 
+controls : Viewport -> Model -> Html Msg
 controls viewport model =
-    [ Html.div
+    Html.div
         [ style "position" "fixed"
         , style "top" "0"
         , style "left" "640px"
@@ -395,9 +410,16 @@ controls viewport model =
             , value = model.materials.grass
             }
         ]
-    ]
 
 
+slider :
+    { label : String
+    , onChange : Float -> msg
+    , min : Float
+    , max : Float
+    , value : Float
+    }
+    -> Html msg
 slider { label, onChange, min, max, value } =
     Html.div []
         [ Html.label [ Typography.caption ]
@@ -412,6 +434,12 @@ slider { label, onChange, min, max, value } =
         ]
 
 
+materialControl :
+    { label : String
+    , onChange : MaterialInput -> msg
+    , value : MaterialInput
+    }
+    -> Html msg
 materialControl { label, onChange, value } =
     let
         ( hue, saturation, luminance ) =
@@ -475,6 +503,12 @@ materialControl { label, onChange, value } =
         ]
 
 
+lightControl :
+    { label : String
+    , onChange : LightInput -> msg
+    , value : LightInput
+    }
+    -> Html msg
 lightControl { label, onChange, value } =
     let
         { azimuth, elevation } =
@@ -501,12 +535,15 @@ lightControl { label, onChange, value } =
         ]
 
 
-animationLength =
-    Duration.seconds 5
-
-
+scene : Viewport -> Model -> Html Msg
 scene viewport model =
     let
+        width =
+            min 600 (viewport.width - 2 * margin)
+
+        height =
+            width * aspectRatio
+
         materials =
             { brick = Material.pbr model.materials.brick
             , shingles = Material.pbr model.materials.shingles
@@ -532,18 +569,6 @@ scene viewport model =
                 Scene3d.directionalLight Scene3d.doesNotCastShadows
                     (f model.lights.back)
             }
-
-        margin =
-            8
-
-        width =
-            min 600 (viewport.width - 2 * margin)
-
-        height =
-            width * aspectRatio
-
-        aspectRatio =
-            385 / 600
     in
     Scene3d.toHtml []
         { camera = camera model
@@ -578,6 +603,15 @@ scene viewport model =
         ]
 
 
+type alias Materials coordinates =
+    { brick : Material.Uniform coordinates
+    , shingles : Material.Uniform coordinates
+    , copper : Material.Uniform coordinates
+    , grass : Material.Uniform coordinates
+    }
+
+
+frontBlock : Materials coordinates -> Entity.Entity coordinates
 frontBlock materials =
     let
         smallDormer =
@@ -648,6 +682,7 @@ frontBlock materials =
         ]
 
 
+rightBlock : Materials coordinates -> Entity.Entity coordinates
 rightBlock materials =
     Scene3d.group
         [ Scene3d.translateBy (Vector3d.meters 4.1 0.1 0) <|
@@ -669,26 +704,30 @@ rightBlock materials =
         ]
 
 
+leftBlock : Materials coordinates -> Entity.Entity coordinates
 leftBlock materials =
     Scene3d.mirrorAcross Plane3d.yz (rightBlock materials)
 
 
+backBlock : Materials coordinates -> Entity.Entity coordinates
 backBlock materials =
-    [ Scene3d.translateBy (Vector3d.meters 0 1.8 0) <|
-        roofedWall materials
-            ( Length.meters 8.3, Length.meters 0.8 )
-            (Length.meters 1.5)
-            (Length.meters 0.95)
-    , Scene3d.translateBy (Vector3d.meters 0 2 0) <|
-        roofedWall materials
-            ( Length.meters 2.5, Length.meters 1.1 )
-            (Length.meters 1.5)
-            (Length.meters 1.25)
-    , Scene3d.translateBy (Vector3d.meters 0 2.7 0) <|
-        wall materials ( Length.meters 1.8, Length.meters 0.5, Length.meters 1.5 )
-    ]
+    Scene3d.group
+        [ Scene3d.translateBy (Vector3d.meters 0 1.8 0) <|
+            roofedWall materials
+                ( Length.meters 8.3, Length.meters 0.8 )
+                (Length.meters 1.5)
+                (Length.meters 0.95)
+        , Scene3d.translateBy (Vector3d.meters 0 2 0) <|
+            roofedWall materials
+                ( Length.meters 2.5, Length.meters 1.1 )
+                (Length.meters 1.5)
+                (Length.meters 1.25)
+        , Scene3d.translateBy (Vector3d.meters 0 2.7 0) <|
+            wall materials ( Length.meters 1.8, Length.meters 0.5, Length.meters 1.5 )
+        ]
 
 
+centerBlock : Materials coordinates -> Entity.Entity coordinates
 centerBlock materials =
     Scene3d.group
         [ wall materials ( Length.meters 4.2, Length.meters 3.4, Length.meters 1.5 )
@@ -696,6 +735,7 @@ centerBlock materials =
         ]
 
 
+centerTower : Materials coordinates -> Entity.Entity coordinates
 centerTower materials =
     Scene3d.group
         [ wall materials
@@ -718,6 +758,7 @@ centerTower materials =
         ]
 
 
+frontTowers : Materials coordinates -> Entity.Entity coordinates
 frontTowers materials =
     Scene3d.group
         [ leftFrontTower materials
@@ -725,6 +766,7 @@ frontTowers materials =
         ]
 
 
+leftFrontTower : Materials coordinates -> Entity.Entity coordinates
 leftFrontTower materials =
     Scene3d.group
         [ Scene3d.translateBy (Vector3d.meters 2.9 -2.25 0) <|
@@ -740,10 +782,12 @@ leftFrontTower materials =
         ]
 
 
+rightFrontTower : Materials coordinates -> Entity.Entity coordinates
 rightFrontTower materials =
     Scene3d.mirrorAcross Plane3d.yz (leftFrontTower materials)
 
 
+ground : Materials coordinates -> Entity.Entity coordinates
 ground { grass } =
     Scene3d.block Scene3d.doesNotCastShadows grass <|
         Block3d.centeredOn
@@ -761,6 +805,18 @@ ground { grass } =
 -- PRIMITIVES
 
 
+type alias Dimensions3 =
+    ( Quantity.Quantity Float Meters, Quantity.Quantity Float Meters, Quantity.Quantity Float Meters )
+
+
+type alias Dimensions2 =
+    ( Quantity.Quantity Float Meters, Quantity.Quantity Float Meters )
+
+
+wallHelper :
+    Material.Uniform coordinates
+    -> Dimensions3
+    -> Scene3d.Entity coordinates
 wallHelper material ( width, depth, height ) =
     Scene3d.block Scene3d.castsShadows material <|
         Block3d.centeredOn
@@ -774,10 +830,16 @@ wallHelper material ( width, depth, height ) =
             ( width, depth, height )
 
 
+wall : Materials coordinates -> Dimensions3 -> Scene3d.Entity coordinates
 wall { brick } dimensions =
     wallHelper (Material.uniform brick) dimensions
 
 
+slantedRoofHelper :
+    Material.Uniform coordinates
+    -> Material.Uniform coordinates
+    -> Dimensions3
+    -> Scene3d.Entity coordinates
 slantedRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
     let
         halfWidth =
@@ -821,6 +883,11 @@ slantedRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
         ]
 
 
+straightRoofHelper :
+    Material.Uniform coordinates
+    -> Material.Uniform coordinates
+    -> Dimensions3
+    -> Scene3d.Entity coordinates
 straightRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
     let
         halfWidth =
@@ -862,6 +929,7 @@ straightRoofHelper triangleMaterial quadMaterial ( width, depth, height ) =
         ]
 
 
+wallRoof : Materials coordinates -> Dimensions3 -> Scene3d.Entity coordinates
 wallRoof { shingles } (( width, depth, height ) as dimensions) =
     if Quantity.greaterThan depth width then
         Scene3d.rotateAround Axis3d.z (Angle.degrees 90) <|
@@ -871,6 +939,7 @@ wallRoof { shingles } (( width, depth, height ) as dimensions) =
         slantedRoofHelper shingles shingles dimensions
 
 
+dormerRoof : Materials coordinates -> Dimensions3 -> Scene3d.Entity coordinates
 dormerRoof { brick, shingles } (( width, depth, height ) as dimensions) =
     if Quantity.greaterThan depth width then
         Scene3d.rotateAround Axis3d.z (Angle.degrees 90) <|
@@ -880,6 +949,10 @@ dormerRoof { brick, shingles } (( width, depth, height ) as dimensions) =
         straightRoofHelper brick shingles dimensions
 
 
+towerRoof :
+    Materials coordinates
+    -> Dimensions2
+    -> Scene3d.Entity coordinates
 towerRoof { copper } ( width, height ) =
     let
         halfWidth =
@@ -916,13 +989,19 @@ towerRoof { copper } ( width, height ) =
 
 
 -- UTILITIES
--- TODO: comment
 
 
+tower : Materials coordinates -> Dimensions3 -> Scene3d.Entity coordinates
 tower { copper } dimensions =
     wallHelper (Material.uniform copper) dimensions
 
 
+roofedWall :
+    Materials coordinates
+    -> Dimensions2
+    -> Quantity.Quantity Float Meters
+    -> Quantity.Quantity Float Meters
+    -> Scene3d.Entity coordinates
 roofedWall materials ( width, depth ) wallHeight roofHeight =
     Scene3d.group
         [ wall materials ( width, depth, wallHeight )
@@ -933,11 +1012,16 @@ roofedWall materials ( width, depth ) wallHeight roofHeight =
         ]
 
 
+dormer :
+    Materials coordinates
+    -> ( Quantity.Quantity Float Meters, Quantity.Quantity Float Meters )
+    -> Quantity.Quantity Float Meters
+    -> Quantity.Quantity Float Meters
+    -> Scene3d.Entity coordinates
 dormer materials ( width, depth ) wallHeight roofHeight =
     Scene3d.group
         [ wall materials ( width, depth, wallHeight )
         , Scene3d.translateBy
             (Vector3d.xyz (Length.meters 0) (Length.meters 0) wallHeight)
-          <|
-            dormerRoof materials ( width, depth, roofHeight )
+            (dormerRoof materials ( width, depth, roofHeight ))
         ]
