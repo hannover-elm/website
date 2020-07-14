@@ -4,6 +4,7 @@ import Angle exposing (Angle)
 import Axis3d
 import Block3d
 import Browser
+import Browser.Dom
 import Browser.Events
 import Camera3d exposing (Camera3d)
 import Color exposing (Color)
@@ -33,10 +34,16 @@ import Scene3d.Mesh as Mesh
 import Scene3d.Transformation as Transformation
 import SketchPlane3d
 import Sphere3d
+import Task exposing (Task)
 import Triangle2d
 import Triangle3d
 import Vector3d
 import Viewpoint3d exposing (Viewpoint3d)
+
+
+type State
+    = Loading
+    | Loaded { width : Float, height : Float } Model
 
 
 type alias Model =
@@ -197,14 +204,36 @@ type Msg
         , azimuth : Angle
         , elevation : Angle
         }
+    | Resized { width : Float, height : Float }
 
 
 init () =
-    ( initialModel, Cmd.none )
+    ( Loading
+    , Browser.Dom.getViewport
+        |> Task.map (\viewport -> viewport.scene)
+        |> Task.perform Resized
+    )
 
 
-update msg model =
-    ( case msg of
+update : Msg -> State -> ( State, Cmd Msg )
+update msg state =
+    case ( msg, state ) of
+        ( Resized viewport, Loading ) ->
+            ( Loaded viewport initialModel, Cmd.none )
+
+        ( _, Loading ) ->
+            ( Loading, Cmd.none )
+
+        ( Resized viewport, Loaded _ model ) ->
+            ( Loaded viewport (updateLoaded msg model), Cmd.none )
+
+        ( _, Loaded viewport model ) ->
+            ( Loaded viewport (updateLoaded msg model), Cmd.none )
+
+
+updateLoaded : Msg -> Model -> Model
+updateLoaded msg model =
+    case msg of
         FocalPointZChanged focalPointZ ->
             { model | focalPointZ = focalPointZ }
 
@@ -240,12 +269,11 @@ update msg model =
 
         Simulated timeSinceLastFrame ->
             { model
-                | timeElapsed =
-                    Quantity.plus model.timeElapsed
-                        (Duration.milliseconds timeSinceLastFrame)
+                | timeElapsed = model.timeElapsed
             }
-    , Cmd.none
-    )
+
+        Resized _ ->
+            model
 
 
 mapMaterials f model =
@@ -256,21 +284,36 @@ mapLights f model =
     { model | lights = f model.lights }
 
 
-subscriptions model =
-    Browser.Events.onAnimationFrameDelta Simulated
+subscriptions : State -> Sub Msg
+subscriptions state =
+    let
+        onResized =
+            Browser.Events.onResize
+                (\width height ->
+                    Resized { width = toFloat width, height = toFloat height }
+                )
+
+        onSimulated =
+            Browser.Events.onAnimationFrameDelta Simulated
+    in
+    case state of
+        Loading ->
+            onResized
+
+        Loaded _ _ ->
+            Sub.batch [ onResized, onSimulated ]
 
 
-view model =
-    Html.div []
-        (List.concat
-            [ scene model
-            , controls model
-            , overlay
-            ]
-        )
+view state =
+    case state of
+        Loading ->
+            text ""
+
+        Loaded viewport model ->
+            Html.div [] (scene viewport model :: controls viewport model)
 
 
-controls model =
+controls viewport model =
     [ Html.div
         [ style "position" "fixed"
         , style "top" "0"
@@ -458,24 +501,11 @@ lightControl { label, onChange, value } =
         ]
 
 
-overlay =
-    [ Html.img
-        [ Html.Attributes.src "../mockup.png"
-        , style "position" "absolute"
-        , style "top" "0px"
-        , style "left" "0px"
-        , style "z-index" "-1"
-        , style "display" "none"
-        ]
-        []
-    ]
-
-
 animationLength =
     Duration.seconds 5
 
 
-scene model =
+scene viewport model =
     let
         materials =
             { brick = Material.pbr model.materials.brick
@@ -502,41 +532,50 @@ scene model =
                 Scene3d.directionalLight Scene3d.doesNotCastShadows
                     (f model.lights.back)
             }
-    in
-    [ Html.div [ style "opacity" "1.85" ]
-        [ Scene3d.toHtml []
-            { camera = camera model
-            , dimensions = ( Pixels.pixels 600, Pixels.pixels 385 )
-            , environmentalLighting =
-                Scene3d.softLighting
-                    { upDirection = Direction3d.positiveZ
-                    , above = ( Luminance.nits 5000, Chromaticity.d65 )
-                    , below = ( Quantity.zero, Chromaticity.d65 )
-                    }
-            , lights = Scene3d.threeLights lights.key lights.fill lights.back
-            , exposure = Exposure.fromMaxLuminance (Luminance.nits 5000)
-            , whiteBalance = Scene3d.defaultWhiteBalance
-            , background =
-                Scene3d.backgroundColor (Color.fromHSL ( 206.1, 48.1, 74.7 ))
-            }
-            [ Entity.rotateAround Axis3d.z
-                (Angle.degrees (1.5 * cos (Duration.inSeconds model.timeElapsed)))
-              <|
-                Entity.translateBy (Vector3d.meters 0 0 0) <|
-                    Entity.group
-                        [ frontBlock materials
-                        , rightBlock materials
-                        , leftBlock materials
 
-                        -- TODO: , centerBlock
-                        -- TODO: , backBlock
-                        , frontTowers materials
-                        , centerTower materials
-                        , ground materials
-                        ]
-            ]
+        margin =
+            8
+
+        width =
+            min 600 (viewport.width - 2 * margin)
+
+        height =
+            width * aspectRatio
+
+        aspectRatio =
+            385 / 600
+    in
+    Scene3d.toHtml []
+        { camera = camera model
+        , dimensions = ( Pixels.pixels width, Pixels.pixels height )
+        , environmentalLighting =
+            Scene3d.softLighting
+                { upDirection = Direction3d.positiveZ
+                , above = ( Luminance.nits 5000, Chromaticity.d65 )
+                , below = ( Quantity.zero, Chromaticity.d65 )
+                }
+        , lights = Scene3d.threeLights lights.key lights.fill lights.back
+        , exposure = Exposure.fromMaxLuminance (Luminance.nits 5000)
+        , whiteBalance = Scene3d.defaultWhiteBalance
+        , background =
+            Scene3d.backgroundColor (Color.fromHSL ( 206.1, 48.1, 74.7 ))
+        }
+        [ Entity.rotateAround Axis3d.z
+            (Angle.degrees (1.5 * cos (Duration.inSeconds model.timeElapsed)))
+          <|
+            Entity.translateBy (Vector3d.meters 0 0 0) <|
+                Entity.group
+                    [ frontBlock materials
+                    , rightBlock materials
+                    , leftBlock materials
+
+                    -- TODO: , centerBlock
+                    -- TODO: , backBlock
+                    , frontTowers materials
+                    , centerTower materials
+                    , ground materials
+                    ]
         ]
-    ]
 
 
 frontBlock materials =
