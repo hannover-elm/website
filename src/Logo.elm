@@ -58,7 +58,7 @@ animationLength =
 
 type State
     = Loading
-    | Loaded { width : Float, height : Float } Model
+    | Loaded Viewport Model
 
 
 type alias Model =
@@ -69,7 +69,12 @@ type alias Model =
     , timeElapsed : Duration
     , materials : MaterialInputs
     , lights : LightInputs
+    , cachedBuilding : Entity.Entity Xyz
     }
+
+
+type Xyz
+    = Xyz
 
 
 type alias MaterialInputs =
@@ -89,6 +94,37 @@ type alias LightInputs =
 
 initialModel : Model
 initialModel =
+    let
+        materials =
+            { brick =
+                { baseColor =
+                    Color.fromHSL
+                        ( 38.499064389421264, 56.97875908940121, 78.1079560233666 )
+                , roughness = 1
+                , metallic = 0
+                }
+            , shingles =
+                { baseColor =
+                    Color.fromHSL ( 13.483604447958669, 100, 37.60377358490566 )
+                , roughness = 0.6113207547169811
+                , metallic = 0
+                }
+            , copper =
+                { baseColor =
+                    Color.fromHSL
+                        ( 156.65660377358503, 36.2063492063492, 72.0377358490566 )
+                , roughness = 0.7622142058283398
+                , metallic = 0
+                }
+            , grass =
+                { baseColor =
+                    Color.fromHSL
+                        ( 98.15094339622642, 50.18867924528302, 33.9622641509434 )
+                , roughness = 0.8867924528301887
+                , metallic = 0
+                }
+            }
+    in
     { focalPointZ = 3.0068258407915627
     , eyePointY = -20
     , eyePointZ = 0.7548686466307473
@@ -114,31 +150,8 @@ initialModel =
             , elevation = Angle.degrees -45
             }
         }
-    , materials =
-        { brick =
-            { baseColor =
-                Color.fromHSL ( 38.499064389421264, 56.97875908940121, 78.1079560233666 )
-            , roughness = 1
-            , metallic = 0
-            }
-        , shingles =
-            { baseColor = Color.fromHSL ( 13.483604447958669, 100, 37.60377358490566 )
-            , roughness = 0.6113207547169811
-            , metallic = 0
-            }
-        , copper =
-            { baseColor =
-                Color.fromHSL ( 156.65660377358503, 36.2063492063492, 72.0377358490566 )
-            , roughness = 0.7622142058283398
-            , metallic = 0
-            }
-        , grass =
-            { baseColor =
-                Color.fromHSL ( 98.15094339622642, 50.18867924528302, 33.9622641509434 )
-            , roughness = 0.8867924528301887
-            , metallic = 0
-            }
-        }
+    , materials = materials
+    , cachedBuilding = building materials
     }
 
 
@@ -277,7 +290,9 @@ updateLoaded msg model =
 
         Simulated timeSinceLastFrame ->
             { model
-                | timeElapsed = model.timeElapsed
+                | timeElapsed =
+                    Quantity.plus (Duration.milliseconds timeSinceLastFrame)
+                        model.timeElapsed
             }
 
         Resized _ ->
@@ -544,13 +559,6 @@ scene viewport model =
         height =
             width * aspectRatio
 
-        materials =
-            { brick = Material.pbr model.materials.brick
-            , shingles = Material.pbr model.materials.shingles
-            , copper = Material.pbr model.materials.copper
-            , grass = Material.pbr model.materials.grass
-            }
-
         lights =
             let
                 f { chromaticity, intensity, azimuth, elevation } =
@@ -587,19 +595,30 @@ scene viewport model =
         }
         [ Entity.rotateAround Axis3d.z
             (Angle.degrees (1.5 * cos (Duration.inSeconds model.timeElapsed)))
-          <|
-            Entity.translateBy (Vector3d.meters 0 0 0) <|
-                Entity.group
-                    [ frontBlock materials
-                    , rightBlock materials
-                    , leftBlock materials
+            model.cachedBuilding
+        ]
 
-                    -- TODO: , centerBlock
-                    -- TODO: , backBlock
-                    , frontTowers materials
-                    , centerTower materials
-                    , ground materials
-                    ]
+
+building : MaterialInputs -> Entity.Entity coordinates
+building { brick, shingles, copper, grass } =
+    let
+        materials =
+            { brick = Material.pbr brick
+            , shingles = Material.pbr shingles
+            , copper = Material.pbr copper
+            , grass = Material.pbr grass
+            }
+    in
+    Entity.group
+        [ frontBlock materials
+        , rightBlock materials
+        , leftBlock materials
+
+        -- TODO: , centerBlock
+        -- TODO: , backBlock
+        , frontTowers materials
+        , centerTower materials
+        , ground materials
         ]
 
 
