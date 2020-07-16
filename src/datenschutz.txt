@@ -56,7 +56,7 @@ Serverlogfiles). Zu den Zugriffsdaten gehören:
 - Referer URL (d.h. die zuvor besuchte Seite)
 - Websites, die vom System des Nutzers über unsere Website aufgerufen werden
 - Internet-Service-Provider des Nutzers
-- IP-Adresse und der anfragende Provider 
+- IP-Adresse und der anfragende Provider
 
 Wir nutzen diese Protokolldaten ohne Zuordnung zu Ihrer Person oder sonstiger
 Profilerstellung für statistische Auswertungen zum Zweck des Betriebs, der
@@ -114,7 +114,7 @@ In den Cookies werden etwa folgende Daten und Informationen gespeichert:
 - Spracheinstellungen
 - eingegebene Suchbegriffe
 - Informationen über die Anzahl der Aufrufe unserer Website sowie Nutzung
-  einzelner Funktionen unseres Internetauftritts. 
+  einzelner Funktionen unseres Internetauftritts.
 
 Bei Aktivierung des Cookies wird diesem eine Identifikationsnummer zugewiesen
 und eine Zuordnung Ihrer personenbezogenen Daten zu dieser
@@ -256,7 +256,7 @@ verlangen. Des Weiteren besteht ein Recht auf folgende Informationen:
 - das Bestehen einer automatisierten Entscheidungsfindung einschließlich
   Profiling gemäß Art. 22 Abs. 1 und 4 DSGVO und – zumindest in diesen Fällen –
   aussagekräftige Informationen über die involvierte Logik sowie die Tragweite
-  und die angestrebten Auswirkungen einer derartigen Verarbeitung für Sie. 
+  und die angestrebten Auswirkungen einer derartigen Verarbeitung für Sie.
 
 Werden personenbezogene Daten an ein Drittland oder an eine internationale
 Organisation übermittelt, so haben Sie das Recht, über die geeigneten Garantien
@@ -300,7 +300,7 @@ folgenden Gründe zutrifft:
   Verpflichtung nach dem Unionsrecht oder dem Recht der Mitgliedstaaten
   erforderlich, dem wir unterliegen.
 - Die personenbezogenen Daten wurden in Bezug auf angebotene Dienste der
-  Informationsgesellschaft gemäß Art. 8 Abs. 1 DSGVO erhoben. 
+  Informationsgesellschaft gemäß Art. 8 Abs. 1 DSGVO erhoben.
 
 Haben wir die personenbezogenen Daten öffentlich gemacht und sind wir gemäß
 Art. 17 Abs. 1 DSGVO zu deren Löschung verpflichtet, so treffen wir unter
@@ -331,7 +331,7 @@ wenn eine der folgenden Voraussetzungen gegeben ist:
   Verteidigung von Rechtsansprüchen benötigen, oder
 - Sie Widerspruch gegen die Verarbeitung gemäß Art. 21 Abs. 1 DSGVO eingelegt
   haben, solange noch nicht feststeht, ob die berechtigten Gründe unseres
-  Unternehmens gegenüber den Ihren überwiegen. 
+  Unternehmens gegenüber den Ihren überwiegen.
 
 6.5 Recht auf Datenübertragbarkeit
 Sie haben das Recht, Sie betreffende personenbezogene Daten maschinenlesbar zu
@@ -347,7 +347,7 @@ Verantwortlichen ohne Behinderung durch uns zu übermitteln, sofern
 - die Verarbeitung auf einer Einwilligung gemäß Art. 6 Abs. 1 S. 1 a) DSGVO
   oder Art. 9 Abs. 2 a) DSGVO oder auf einem Vertrag gemäß Art. 6 Abs. 1 S. 1
   b) DSGVO beruht und
-- die Verarbeitung mithilfe automatisierter Verfahren erfolgt. 
+- die Verarbeitung mithilfe automatisierter Verfahren erfolgt.
 
 Bei der Ausübung Ihres Rechts auf Datenübertragbarkeit gemäß Absatz 1 haben Sie
 das Recht, zu erwirken, dass die personenbezogenen Daten direkt von uns einem

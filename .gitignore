@@ -1,7 +1,6 @@
-_cache
+dist-newstyle
 elm-stuff
-events.json
-index.css
-logo.js
-meetup.json
-_site
+public
+src/events.json
+src/meetup.json
+src/.shake

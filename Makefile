@@ -1,29 +1,28 @@
-build: src/Main.hs index.css meetup.json events.json logo.js
-	runghc src/Main.hs rebuild
-
-logo.js: src/Logo.elm
-	elm make --optimize src/Logo.elm --output logo.js
+build: json
+	cabal build
+	cabal run website
 
 
-index.css: src/index.sass
-	sassc src/index.sass > index.css
+watch: json
+	ghcid -T ":main -wS"
 
 
-meetup.json:
-	curl "https://api.meetup.com/Hannover-Elm-Language-Meetup" | jq . > meetup.json
+json: src/meetup.json src/events.json
 
 
-events.json:
-	curl "https://api.meetup.com/Hannover-Elm-Language-Meetup/events" | jq . > events.json
+src/meetup.json:
+	curl "https://api.meetup.com/Hannover-Elm-Language-Meetup" | jq . > src/meetup.json
+
+
+src/events.json:
+	curl "https://api.meetup.com/Hannover-Elm-Language-Meetup/events" | jq . > src/events.json
 
 
 clean:
-	rm -f index.css
-	rm -f logo.js
-	rm -rf _site
+	rm -f src/events.json
+	rm -f src/meetup.json
+	rm -rf public
 
 
 distclean: clean
-	rm -f events.json
-	rm -f meetup.json
-	rm -rf _cache
+	rm -rf dist-newstyle elm-stuff
